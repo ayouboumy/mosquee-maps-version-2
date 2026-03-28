@@ -195,10 +195,8 @@ function RouteLine({ start, end, straightDistance, isMainRoute, routeProfile = '
         const response = await fetch(`${baseUrl}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&alternatives=true`);
         const data = await response.json();
         if (isMounted && data.routes && data.routes.length > 0) {
-          // Find the route with the absolute shortest distance among all alternatives
-          const bestRoute = data.routes.reduce((prev: any, current: any) => 
-            (prev.distance < current.distance) ? prev : current
-          );
+          // Trust OSRM's primary native algorithm instead of forcing shortest physical path
+          const bestRoute = data.routes[0];
 
           if (bestRoute.geometry) {
             const coords = bestRoute.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
@@ -389,10 +387,7 @@ export default function MapView({ showNearest }: { showNearest?: boolean }) {
 if (!response.ok) return null;
 const data = await response.json();
 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-  // Find the route with the shortest distance among all alternatives
-  const bestRoute = data.routes.reduce((prev: any, current: any) =>
-    (prev.distance < current.distance) ? prev : current
-  );
+  const bestRoute = data.routes[0];
   return { id: m.id, distance: bestRoute.distance, duration: bestRoute.duration };
 }
           } catch (e) {

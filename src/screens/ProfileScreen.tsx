@@ -3,7 +3,7 @@ import {
   ArrowLeft, MapPin, Navigation, Heart, CheckCircle2, 
   Clipboard, Check, Share2, Building2, Users, Maximize, 
   Home, Droplets, Info, Activity, Clock, ShieldCheck,
-  Compass
+  Compass, FileText, Globe, XCircle
 } from 'lucide-react';
 import { Mosque } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -73,31 +73,26 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
     }
   };
 
+  function formatDisplayNumber(val: any) {
+    if (typeof val === 'number') {
+      return new Intl.NumberFormat().format(val);
+    }
+    const parsed = Number(val);
+    if (!isNaN(parsed) && val.trim?.() !== '') {
+      return new Intl.NumberFormat().format(parsed);
+    }
+    return val;
+  }
+
   // Intelligent Data Organization
-  const { organizedData, highlights, openingStatus } = useMemo(() => {
+  const { organizedData, highlights, adminData, openingStatus } = useMemo(() => {
     const highlightsList: { label: string; value: string; icon: any; color: string }[] = [];
+    const adminHierarchy: { key: string; value: string }[] = [];
     let opening: string | null = null;
-    if (!mosque.extraData) return { organizedData: [], highlights: [], openingStatus: null };
+    
+    if (!mosque.extraData) return { organizedData: [], highlights: [], adminData: [], openingStatus: null };
 
     const categories = [
-      {
-        id: 'general',
-        title: t('General Information', language),
-        icon: Info,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50',
-        keys: ['type de commune', 'milieu', 'code', 'nature', 'entité de financement', 'financement', 'ministère', 'habous', 'région', 'province', 'caïdat', 'nidhara', 'awqaf', 'état', 'condition'],
-        items: [] as { key: string; value: any }[]
-      },
-      {
-        id: 'situation',
-        title: t('Situation Information', language),
-        icon: MapPin,
-        color: 'text-indigo-600',
-        bgColor: 'bg-indigo-50',
-        keys: ['x', 'y', 'coordonnées', 'topographie', 'pentes', 'ravin', 'autre terrain', 'zone thermique'],
-        items: [] as { key: string; value: any }[]
-      },
       {
         id: 'capacity',
         title: t('Capacity & Space', language),
@@ -113,7 +108,7 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         icon: Users,
         color: 'text-emerald-600',
         bgColor: 'bg-emerald-50',
-        keys: ['femme', 'homme', 'salle', 'prière', 'étage', 'mezzanine'],
+        keys: ['femme', 'homme', 'salle', 'prière', 'étage', 'mezzanine', 'prier'],
         items: [] as { key: string; value: any }[]
       },
       {
@@ -122,7 +117,16 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         icon: Droplets,
         color: 'text-cyan-600',
         bgColor: 'bg-cyan-50',
-        keys: ['eau', 'électricité', 'sanitaire', 'latrine', 'toilette', 'abdest', 'puits', 'compteur', 'robinet'],
+        keys: ['eau', 'électricité', 'sanitaire', 'latrine', 'toilette', 'abdest', 'puits', 'compteur', 'robinet', 'lavabo', 'bassin', 'fontaine'],
+        items: [] as { key: string; value: any }[]
+      },
+      {
+        id: 'status',
+        title: t('Status & Foundation', language),
+        icon: Activity,
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-50',
+        keys: ['construction', 'date', 'terrain', 'titre', 'foncier', 'clôture', 'urbain', 'rural', 'صومعة', 'état', 'condition'],
         items: [] as { key: string; value: any }[]
       },
       {
@@ -131,16 +135,16 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         icon: Home,
         color: 'text-amber-600',
         bgColor: 'bg-amber-50',
-        keys: ['logement', 'imam', 'mouadhine', 'mouadine', 'gardien', 'fquih'],
+        keys: ['logement', 'imam', 'mouadhine', 'mouadine', 'gardien', 'fquih', 'imamat'],
         items: [] as { key: string; value: any }[]
       },
       {
-        id: 'status',
-        title: t('Status & Environment', language),
-        icon: Activity,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50',
-        keys: ['construction', 'date', 'terrain', 'titre', 'foncier', 'clôture', 'urbain', 'rural', 'صومعة'],
+        id: 'finances',
+        title: t('Administration & Finance', language),
+        icon: FileText,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+        keys: ['entité', 'financement', 'ministère', 'habous', 'nidhara', 'awqaf', 'association', 'bienfaiteur'],
         items: [] as { key: string; value: any }[]
       },
       {
@@ -154,19 +158,44 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
       }
     ];
 
+    const administrativeKeys = ['région', 'province', 'préfecture', 'caïdat', 'commune', 'milieu', 'cercle'];
+
     // Deep Analysis for Highlights and Categorization
     Object.entries(mosque.extraData).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
-      const valStr = String(value);
+      let valStr = String(value).trim();
+
+      // Handle Truthy/Falsy visually
+      if (['oui', 'yes', 'true', 'vrai', '✅'].includes(valStr.toLowerCase())) {
+        valStr = 'BOOLEAN_TRUE';
+      } else if (['non', 'no', 'false', 'faux', '❌'].includes(valStr.toLowerCase())) {
+        valStr = 'BOOLEAN_FALSE';
+      }
+
+      // Format Numbers
+      if (valStr !== 'BOOLEAN_TRUE' && valStr !== 'BOOLEAN_FALSE') {
+          valStr = formatDisplayNumber(valStr);
+      }
+
+      // Administrative extraction (Région, Province, etc)
+      let isAdmin = false;
+      for (let adminKey of administrativeKeys) {
+        if (lowerKey.includes(adminKey)) {
+          adminHierarchy.push({ key, value: valStr });
+          isAdmin = true;
+          break;
+        }
+      }
+      if (isAdmin) return;
 
       // Extract Opening Status
       if (lowerKey.includes('ouvert') || lowerKey.includes('fermé') || lowerKey.includes('statut d\'ouverture')) {
-        opening = valStr;
+        opening = String(value);
         return;
       }
 
       // Extract highlights...
-      if ((lowerKey.includes('capacité') || lowerKey.includes('nombre de fidèles')) && !highlightsList.find(h => h.label === 'Capacity')) {
+      if ((lowerKey.includes('capacité') || lowerKey.includes('nombre de fidèles') || lowerKey.includes('capacity')) && !highlightsList.find(h => h.label === 'Capacity')) {
         highlightsList.push({ label: 'Capacity', value: valStr, icon: Users, color: 'emerald' });
         return;
       }
@@ -174,31 +203,33 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         highlightsList.push({ label: 'Surface', value: valStr, icon: Maximize, color: 'blue' });
         return;
       }
-      if (lowerKey.includes('état') && !highlightsList.find(h => h.label === 'Condition')) {
-        highlightsList.push({ label: 'Condition', value: valStr, icon: Activity, color: 'amber' });
+      if ((lowerKey.includes('état') || lowerKey.includes('condition')) && !highlightsList.find(h => h.label === 'Condition')) {
+        highlightsList.push({ label: 'Condition', value: String(value), icon: Activity, color: 'amber' });
         return;
       }
-      if (lowerKey.includes('construction') && !highlightsList.find(h => h.label === 'Built')) {
-        highlightsList.push({ label: 'Built', value: valStr, icon: Clock, color: 'purple' });
-        return;
+
+      // Filter out redundant coordinate data since we map it
+      if (['x', 'y', 'latitude', 'longitude', 'lat', 'lng', 'coordonnées', 'coordonnees'].includes(lowerKey)) {
+          return;
       }
 
       let found = false;
       for (const cat of categories) {
         if (cat.keys.some(k => lowerKey.includes(k))) {
-          cat.items.push({ key, value });
+          cat.items.push({ key, value: valStr });
           found = true;
           break;
         }
       }
-      if (!found) {
-        categories.find(c => c.id === 'other')?.items.push({ key, value });
+      if (!found && valStr !== '') {
+        categories.find(c => c.id === 'other')?.items.push({ key, value: valStr });
       }
     });
 
     return { 
       organizedData: categories.filter(cat => cat.items.length > 0),
       highlights: highlightsList,
+      adminData: adminHierarchy,
       openingStatus: opening
     };
   }, [mosque.extraData, language]);
@@ -220,25 +251,27 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-emerald-900 flex items-center justify-center">
-            <Compass size={64} className="text-emerald-500 opacity-50" />
+          <div className="w-full h-full bg-gradient-to-br from-emerald-900 to-emerald-800 flex items-center justify-center">
+            <Compass size={64} className="text-emerald-500/30" />
+            <div className="absolute inset-0 bg-black/20" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
         
         <button 
           onClick={onClose}
-          className={`absolute top-safe-4 ${language === 'ar' ? 'right-4' : 'left-4'} p-3 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-all border border-white/20 z-10`}
+          className={`absolute top-safe-4 ${language === 'ar' ? 'right-4' : 'left-4'} p-3 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-all border border-white/20 z-10 active:scale-90`}
         >
           <ArrowLeft size={24} className={language === 'ar' ? 'rotate-180' : ''} />
         </button>
 
-        <div className="absolute bottom-8 left-6 right-6 text-white z-10">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="absolute bottom-6 left-5 right-5 text-white z-10">
+           {/* Badges */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             <motion.div 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              className="px-3 py-1.5 bg-emerald-500/90 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg shadow-emerald-900/30 flex items-center gap-1.5"
+              className="px-3 py-1 bg-emerald-500/90 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg shadow-emerald-900/30 flex items-center gap-1.5"
             >
               <ShieldCheck size={14} />
               {t(mosque.type, language)}
@@ -250,7 +283,7 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 }}
                 className={cn(
-                  "px-3 py-1.5 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg flex items-center gap-1.5",
+                  "px-3 py-1 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg flex items-center gap-1.5",
                   openingStatus.toLowerCase().includes('ouvert') 
                     ? "bg-blue-500/90 shadow-blue-900/30" 
                     : "bg-red-500/90 shadow-red-900/30"
@@ -260,19 +293,12 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
                 {openingStatus}
               </motion.div>
             )}
-            
-            {mosque.commune && (
-              <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg flex items-center gap-1.5">
-                <Building2 size={14} />
-                {t(mosque.commune, language)}
-              </div>
-            )}
           </div>
           
           <motion.h1 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-3xl sm:text-5xl font-serif font-black mb-3 leading-[1.15] tracking-tight drop-shadow-xl"
+            className="text-3xl sm:text-5xl font-serif font-black mb-2 leading-[1.1] tracking-tight drop-shadow-xl"
           >
             {getLocalizedName(mosque, language)}
           </motion.h1>
@@ -345,11 +371,11 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
                   {mosque.latitude.toFixed(5)}, {mosque.longitude.toFixed(5)}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleCopyPosition} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-bold text-gray-600 transition-colors">
-                    {copied ? t('Copied', language) : t('Copy', language)}
+                  <button onClick={handleOpenGoogleMapsRoute} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-[10px] text-xs font-bold transition-colors">
+                    Maps
                   </button>
-                  <button onClick={handleOpenGoogleMapsRoute} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full text-xs font-bold transition-colors">
-                    Google Maps
+                  <button onClick={handleCopyPosition} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-[10px] text-xs font-bold text-gray-600 transition-colors">
+                    {copied ? t('Copied', language) : t('Copy', language)}
                   </button>
                 </div>
               </div>
@@ -364,12 +390,32 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
                   <div className={cn("p-2.5 rounded-xl shrink-0", `bg-${h.color}-50 text-${h.color}-600`)}>
                     <h.icon size={20} />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-0.5">{t(h.label, language)}</p>
-                    <p className="text-base font-black text-gray-900 truncate">{h.value}</p>
+                    <p className="text-base font-black text-gray-900 truncate" title={String(h.value)}>{h.value}</p>
                   </div>
                 </div>
               ))}
+            </section>
+          )}
+
+          {/* Administrative Data Block */}
+          {adminData.length > 0 && (
+            <section className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
+               <div className="px-5 py-4 border-b border-gray-100 bg-emerald-50/30 flex items-center gap-3">
+                 <div className="p-2 rounded-xl shrink-0 bg-emerald-100 text-emerald-700">
+                  <Globe size={18} />
+                 </div>
+                 <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">{t('Administrative Hierarchy', language)}</h2>
+              </div>
+              <div className="p-4 grid grid-cols-2 gap-y-4 gap-x-6">
+                 {adminData.map((item, idx) => (
+                    <div key={idx} className="flex flex-col">
+                       <span className="text-[10px] font-black tracking-wider uppercase text-gray-400 mb-1">{t(item.key, language)}</span>
+                       <span className="text-sm font-bold text-gray-800">{t(item.value, language)}</span>
+                    </div>
+                 ))}
+              </div>
             </section>
           )}
 
@@ -384,9 +430,15 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
               </div>
               <div className="p-2 gap-0.5 flex flex-col">
                 {cat.items.map((item, idx) => (
-                  <div key={idx} className="flex items-start justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-                    <span className="text-xs font-bold text-gray-500 max-w-[40%] leading-relaxed">{t(item.key, language)}</span>
-                    <span className="text-sm font-medium text-gray-900 text-right max-w-[55%]">{t(String(item.value), language)}</span>
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <span className="text-xs font-bold text-gray-500 max-w-[45%] leading-relaxed">{t(item.key, language)}</span>
+                    {item.value === 'BOOLEAN_TRUE' ? (
+                       <CheckCircle2 size={20} className="text-emerald-500 fill-emerald-100 shrink-0" />
+                    ) : item.value === 'BOOLEAN_FALSE' ? (
+                       <XCircle size={20} className="text-red-500 fill-red-100 shrink-0" />
+                    ) : (
+                       <span className="text-sm font-medium text-gray-900 text-right max-w-[50%]">{t(String(item.value), language)}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -394,10 +446,10 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
           ))}
 
           {/* Facilities and Services Chips */}
-          <section className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-5 mt-4">
-            <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">{t('Services & Facilities', language)}</h2>
+          <section className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-5">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 ml-1">{t('Services & Facilities', language)}</h2>
             
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               {mosque.services.map(service => (
                 <div key={service} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100/50 rounded-full text-xs font-bold text-emerald-700">
                   <CheckCircle2 size={12} className="text-emerald-500 fill-emerald-100" />
@@ -408,7 +460,7 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
 
             <div className="flex flex-wrap gap-2">
               {mosque.items.map(item => (
-                <div key={item} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[11px] font-bold uppercase tracking-wider rounded-md border border-gray-200/50">
+                <div key={item} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[11px] font-bold uppercase tracking-wider rounded-[10px] border border-gray-200/50">
                   {t(item, language)}
                 </div>
               ))}

@@ -37,10 +37,7 @@ export default function BottomSheet() {
         });
         const data = await response.json();
         if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-          const bestRoute = data.routes.reduce((prev: any, current: any) =>
-            (prev.distance < current.distance) ? prev : current
-          );
-          setRoadDistance(bestRoute.distance);
+          setRoadDistance(data.routes[0].distance);
         }
       } catch (error: any) {
         if (error.name !== 'AbortError') {
@@ -85,7 +82,8 @@ export default function BottomSheet() {
       .slice(0, 3);
   }, [mosques, selectedMosque]);
 
-  if (!selectedMosque) return null;
+  // If we are actively routing to this mosque, do not show the bottom sheet to prevent UI overlap
+  if (!selectedMosque || routingToMosque?.id === selectedMosque.id) return null;
 
   const isFavorite = favorites.includes(selectedMosque.id);
 
