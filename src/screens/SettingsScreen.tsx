@@ -267,7 +267,7 @@ export default function SettingsScreen() {
           </div>
           
           <div className="p-5 flex gap-3">
-            {(['en', 'fr', 'ar'] as Language[]).map((lang) => (
+            {(['ar', 'fr'] as Language[]).map((lang) => (
               <button
                 key={lang}
                 onClick={() => setLanguage(lang)}
@@ -279,10 +279,10 @@ export default function SettingsScreen() {
                 )}
               >
                 <div className="text-2xl drop-shadow-sm">
-                  {lang === 'en' ? '🇬🇧' : lang === 'fr' ? '🇫🇷' : '🇲🇦'}
+                  {lang === 'fr' ? '🇫🇷' : '🇲🇦'}
                 </div>
                 <span className="text-xs font-bold whitespace-nowrap">
-                  {lang === 'en' ? 'English' : lang === 'fr' ? 'Français' : 'العربية'}
+                  {lang === 'fr' ? 'Français' : 'العربية'}
                 </span>
                 {language === lang && (
                   <motion.div layoutId="lang-indicator" className="absolute inset-0 bg-blue-500/5" />

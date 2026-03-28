@@ -316,20 +316,12 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
       </div>
 
       <div className="relative z-20 px-4 sm:px-6 pb-24 -mt-4">
-        {/* Main Route Button - Prominent */}
         <motion.div
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ delay: 0.2 }}
-           className="bg-white rounded-[24px] p-2 shadow-bottom-sheet flex items-center justify-between mb-8 border border-white/50"
+           className="bg-white rounded-[24px] p-2 shadow-bottom-sheet flex items-center justify-end mb-6 border border-white/50"
         >
-          <button
-            onClick={handleStartRoute}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-lg py-4 rounded-[18px] shadow-emerald-glow active:scale-95 transition-all"
-          >
-            <Navigation size={22} className="fill-emerald-100" />
-            {t('Start Live Route', language)}
-          </button>
           <div className="flex gap-2 px-2 shrink-0">
             <button 
               onClick={() => toggleFavorite(mosque.id)}

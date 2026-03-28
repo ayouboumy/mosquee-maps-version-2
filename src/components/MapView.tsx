@@ -244,7 +244,7 @@ function RouteLine({ start, end, straightDistance, isMainRoute, routeProfile = '
   const innerWeight = isDriving ? 6 : 6;
   const outerWeight = isDriving ? 10 : 10;
 
-  const dashArray = isDriving ? undefined : (isMainRoute ? "1, 14" : "5, 12");
+  const dashArray = isMainRoute ? "1, 12" : "1, 14";
 
   const validPositions = positions.filter(p => p && typeof p[0] === 'number' && !isNaN(p[0]) && typeof p[1] === 'number' && !isNaN(p[1]));
   if (validPositions.length < 2) return null;
@@ -267,6 +267,15 @@ function RouteLine({ start, end, straightDistance, isMainRoute, routeProfile = '
         color={innerColor}
         weight={innerWeight}
         opacity={1}
+        lineCap="round"
+        lineJoin="round"
+      />
+      {/* Dashed Overlay for modern litinear look */}
+      <Polyline 
+        positions={validPositions}
+        color="#ffffff"
+        weight={innerWeight - 2}
+        opacity={0.8}
         lineCap="round"
         lineJoin="round"
         dashArray={dashArray}
@@ -378,10 +387,9 @@ export default function MapView({ showNearest }: { showNearest?: boolean }) {
         // This is better than the table API because the public table API only supports driving
         const promises = top5.map(async (m) => {
           try {
-            const profile = (routeProfile || 'foot') === 'foot' ? 'foot' : 'driving';
-            const baseUrl = profile === 'foot' 
-              ? 'https://routing.openstreetmap.de/routed-foot/route/v1/foot'
-              : 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
+            // Default to driving for nearest logic to guarantee accuracy over unpaved foot paths
+            const profile = 'driving';
+            const baseUrl = 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
             
             const response = await fetch(`${baseUrl}/${userLocation.longitude},${userLocation.latitude};${m.lng},${m.lat}?overview=false&alternatives=true`);
 if (!response.ok) return null;

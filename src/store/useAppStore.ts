@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Mosque, TabType } from '../types';
 import mosquesData from '../data/mosques.json';
 
-export type Language = 'en' | 'ar' | 'fr';
+export type Language = 'ar' | 'fr';
 export type RouteProfile = 'foot' | 'driving';
 export type MapStyle = 'street' | 'satellite';
 
@@ -52,7 +52,7 @@ export const useAppStore = create<AppState>()(
       routeInfo: null,
       routeProfile: 'foot',
       userLocation: null,
-      language: 'fr', // Default to French since data is in French
+      language: 'ar', // Default to Arabic
       dynamicTranslations: {},
       selectedCommune: null,
       mapStyle: 'street',
