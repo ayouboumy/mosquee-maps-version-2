@@ -2,13 +2,31 @@ import { motion } from 'motion/react';
 import { 
   ArrowLeft, MapPin, Navigation, Heart, CheckCircle2, 
   Clipboard, Check, Share2, Building2, Users, Maximize, 
-  Home, Droplets, Info, Activity, Clock, ShieldCheck
+  Home, Droplets, Info, Activity, Clock, ShieldCheck,
+  Compass
 } from 'lucide-react';
 import { Mosque } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 import { t, getLocalizedName } from '../utils/translations';
 import { useState, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+
+const miniMapIcon = L.divIcon({
+  className: 'mini-mosque-marker',
+  html: `
+    <div style="width: 30px; height: 30px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); border: 2px solid white;">
+      <div style="transform: rotate(45deg); padding-top: 1px; padding-left: 1px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </div>
+    </div>
+  `,
+  iconSize: [30, 30],
+  iconAnchor: [15, 30]
+});
 
 interface ProfileScreenProps {
   mosque: Mosque;
@@ -16,7 +34,7 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
-  const { favorites, toggleFavorite, language, routeProfile, userLocation } = useAppStore();
+  const { favorites, toggleFavorite, language, routeProfile, userLocation, setRoutingToMosque, mapStyle } = useAppStore();
   const [copied, setCopied] = useState(false);
   const isFavorite = favorites.includes(mosque.id);
 
@@ -39,6 +57,11 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         console.error('Error sharing:', error);
       }
     }
+  };
+
+  const handleStartRoute = () => {
+    setRoutingToMosque(mosque);
+    onClose();
   };
 
   const handleOpenGoogleMapsRoute = () => {
@@ -73,15 +96,6 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
         color: 'text-indigo-600',
         bgColor: 'bg-indigo-50',
         keys: ['x', 'y', 'coordonnées', 'topographie', 'pentes', 'ravin', 'autre terrain', 'zone thermique'],
-        items: [] as { key: string; value: any }[]
-      },
-      {
-        id: 'components',
-        title: t('Mosque Components', language),
-        icon: Building2,
-        color: 'text-emerald-600',
-        bgColor: 'bg-emerald-50',
-        keys: [], // Special handling for combined data
         items: [] as { key: string; value: any }[]
       },
       {
@@ -140,8 +154,6 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
       }
     ];
 
-    const categorizedKeys = new Set<string>();
-
     // Deep Analysis for Highlights and Categorization
     Object.entries(mosque.extraData).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
@@ -156,31 +168,25 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
       // Extract highlights...
       if ((lowerKey.includes('capacité') || lowerKey.includes('nombre de fidèles')) && !highlightsList.find(h => h.label === 'Capacity')) {
         highlightsList.push({ label: 'Capacity', value: valStr, icon: Users, color: 'emerald' });
+        return;
       }
       if ((lowerKey.includes('surface') || lowerKey.includes('superficie')) && !highlightsList.find(h => h.label === 'Surface')) {
         highlightsList.push({ label: 'Surface', value: valStr, icon: Maximize, color: 'blue' });
+        return;
       }
       if (lowerKey.includes('état') && !highlightsList.find(h => h.label === 'Condition')) {
         highlightsList.push({ label: 'Condition', value: valStr, icon: Activity, color: 'amber' });
+        return;
       }
       if (lowerKey.includes('construction') && !highlightsList.find(h => h.label === 'Built')) {
         highlightsList.push({ label: 'Built', value: valStr, icon: Clock, color: 'purple' });
-      }
-
-      // Special handling for combined data (Count, Area, Height)
-      const isCombined = valStr.includes(t('Count', language)) || valStr.includes(t('Area', language)) || valStr.includes(t('Height', language));
-      
-      if (isCombined) {
-        categories.find(c => c.id === 'components')?.items.push({ key, value });
         return;
       }
 
       let found = false;
       for (const cat of categories) {
-        if (cat.id === 'components') continue; // Skip components as it's handled above
         if (cat.keys.some(k => lowerKey.includes(k))) {
           cat.items.push({ key, value });
-          categorizedKeys.add(key);
           found = true;
           break;
         }
@@ -199,61 +205,74 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
 
   return (
     <motion.div
-      initial={{ x: language === 'ar' ? '-100%' : '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: language === 'ar' ? '-100%' : '100%' }}
+      initial={{ y: '100%', opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: '100%', opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-[2000] bg-white overflow-y-auto"
+      className="fixed inset-0 z-[2000] bg-gray-50 overflow-y-auto"
     >
       {/* Hero Section */}
       <div className="relative h-[45vh] min-h-[350px]">
-        <img 
-          src={mosque.image} 
-          alt={getLocalizedName(mosque, language)} 
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+        {mosque.image ? (
+          <img 
+            src={mosque.image} 
+            alt={getLocalizedName(mosque, language)} 
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-emerald-900 flex items-center justify-center">
+            <Compass size={64} className="text-emerald-500 opacity-50" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
         
         <button 
           onClick={onClose}
-          className={`absolute top-safe-4 ${language === 'ar' ? 'right-4' : 'left-4'} p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all border border-white/20 z-10`}
+          className={`absolute top-safe-4 ${language === 'ar' ? 'right-4' : 'left-4'} p-3 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-all border border-white/20 z-10`}
         >
           <ArrowLeft size={24} className={language === 'ar' ? 'rotate-180' : ''} />
         </button>
 
         <div className="absolute bottom-8 left-6 right-6 text-white z-10">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="inline-flex items-center px-4 py-1.5 bg-emerald-500 rounded-full text-[11px] uppercase tracking-widest font-black shadow-lg shadow-emerald-900/20"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="px-3 py-1.5 bg-emerald-500/90 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg shadow-emerald-900/30 flex items-center gap-1.5"
             >
-              <ShieldCheck size={14} className={language === 'ar' ? 'ml-2' : 'mr-2'} />
+              <ShieldCheck size={14} />
               {t(mosque.type, language)}
             </motion.div>
 
             {openingStatus && (
               <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 }}
                 className={cn(
-                  "inline-flex items-center px-4 py-1.5 rounded-full text-[11px] uppercase tracking-widest font-black shadow-lg",
+                  "px-3 py-1.5 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg flex items-center gap-1.5",
                   openingStatus.toLowerCase().includes('ouvert') 
-                    ? "bg-blue-500 shadow-blue-900/20" 
-                    : "bg-red-500 shadow-red-900/20"
+                    ? "bg-blue-500/90 shadow-blue-900/30" 
+                    : "bg-red-500/90 shadow-red-900/30"
                 )}
               >
-                <Clock size={14} className={language === 'ar' ? 'ml-2' : 'mr-2'} />
+                <Clock size={14} />
                 {openingStatus}
               </motion.div>
+            )}
+            
+            {mosque.commune && (
+              <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] uppercase tracking-widest font-black shadow-lg flex items-center gap-1.5">
+                <Building2 size={14} />
+                {t(mosque.commune, language)}
+              </div>
             )}
           </div>
           
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl font-serif font-black mb-4 leading-[1.1] tracking-tight drop-shadow-2xl"
+            className="text-3xl sm:text-5xl font-serif font-black mb-3 leading-[1.15] tracking-tight drop-shadow-xl"
           >
             {getLocalizedName(mosque, language)}
           </motion.h1>
@@ -262,202 +281,143 @@ export default function ProfileScreen({ mosque, onClose }: ProfileScreenProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="flex flex-col gap-4"
+            className="flex items-start text-white/90 text-sm font-medium"
           >
-            <div className="flex items-start text-white/95 text-lg font-medium bg-black/20 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-2xl">
-              <MapPin size={22} className={cn("shrink-0 mt-1", language === 'ar' ? 'ml-4' : 'mr-4')} />
-              <span className="leading-relaxed">{t(mosque.address, language)}</span>
-            </div>
-            
-            {mosque.commune && (
-              <div className="flex items-center text-white/90 text-sm font-bold px-4 py-2 bg-white/5 backdrop-blur-md rounded-xl w-fit border border-white/5">
-                <Building2 size={18} className={cn("shrink-0", language === 'ar' ? 'ml-3' : 'mr-3')} />
-                <span>{t(mosque.commune, language)}</span>
-              </div>
-            )}
+            <MapPin size={16} className={cn("shrink-0 mt-0.5", language === 'ar' ? 'ml-2' : 'mr-2 text-gray-300')} />
+            <span className="leading-snug line-clamp-2">{t(mosque.address, language)}</span>
           </motion.div>
         </div>
       </div>
 
-      <div className="p-6 pb-24 max-w-2xl mx-auto -mt-6 relative z-20 bg-white rounded-t-[32px] shadow-2xl shadow-black/5">
-        {/* Quick Actions */}
-        <div className="flex gap-3 mb-10">
-          <motion.button 
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleOpenGoogleMapsRoute}
-            className="flex-1 flex flex-col items-center justify-center py-4 bg-emerald-600 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-200"
+      <div className="relative z-20 px-4 sm:px-6 pb-24 -mt-4">
+        {/* Main Route Button - Prominent */}
+        <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.2 }}
+           className="bg-white rounded-[24px] p-2 shadow-bottom-sheet flex items-center justify-between mb-8 border border-white/50"
+        >
+          <button
+            onClick={handleStartRoute}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-lg py-4 rounded-[18px] shadow-emerald-glow active:scale-95 transition-all"
           >
-            <Navigation size={24} className="mb-1" />
-            <span className="text-[10px] uppercase tracking-widest">{t('Google Maps', language)}</span>
-          </motion.button>
-          <motion.button 
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleCopyPosition}
-            className="flex-1 flex flex-col items-center justify-center py-4 bg-blue-50 text-blue-600 rounded-2xl font-bold transition-all"
-          >
-            {copied ? <Check size={24} className="mb-1 text-emerald-600" /> : <Clipboard size={24} className="mb-1" />}
-            <span className="text-[10px] uppercase tracking-widest">{t(copied ? 'Copied' : 'Position', language)}</span>
-          </motion.button>
-          <motion.button 
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleShare}
-            className="flex-1 flex flex-col items-center justify-center py-4 bg-gray-50 text-gray-700 rounded-2xl font-bold transition-all"
-          >
-            <Share2 size={24} className="mb-1" />
-            <span className="text-[10px] uppercase tracking-widest">{t('Share', language)}</span>
-          </motion.button>
-          <motion.button 
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => toggleFavorite(mosque.id)}
-            className={cn(
-              "w-16 flex items-center justify-center rounded-2xl transition-all border",
-              isFavorite 
-                ? "bg-red-50 text-red-500 border-red-100" 
-                : "bg-white text-gray-400 border-gray-100"
-            )}
-          >
-            <Heart size={24} className={cn(isFavorite && "fill-current")} />
-          </motion.button>
-        </div>
-
-        {/* Key Highlights */}
-        {highlights.length > 0 && (
-          <section className="mb-16">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] uppercase tracking-[0.4em] font-black text-gray-300">{t('Key Highlights', language)}</h3>
-              <div className="h-px flex-1 bg-gray-100 mx-6" />
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              {highlights.map((h, idx) => (
-                <motion.div 
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="relative group overflow-hidden"
-                >
-                  <div className="flex items-start gap-4 p-2">
-                    <div className={cn("p-3 rounded-2xl shadow-sm transition-transform group-hover:scale-110", `bg-${h.color}-50 text-${h.color}-600`)}>
-                      <h.icon size={24} />
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-black block mb-1">{t(h.label, language)}</span>
-                      <span className="text-2xl text-gray-900 font-serif font-black leading-none">{h.value}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Intelligent Data Sections */}
-        <div className="space-y-12">
-          {organizedData.map((cat, catIdx) => (
-            <motion.section 
-              key={cat.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + catIdx * 0.1 }}
+            <Navigation size={22} className="fill-emerald-100" />
+            {t('Start Live Route', language)}
+          </button>
+          <div className="flex gap-2 px-2 shrink-0">
+            <button 
+              onClick={() => toggleFavorite(mosque.id)}
+              className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full transition-all active:scale-90",
+                isFavorite ? "bg-red-50 text-red-500 shadow-sm" : "bg-gray-100/80 text-gray-500 hover:bg-gray-200"
+              )}
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className={cn("p-2 rounded-xl shadow-sm", cat.bgColor, cat.color)}>
-                    <cat.icon size={18} />
-                  </div>
-                  <h3 className="text-sm font-serif font-black uppercase tracking-widest text-gray-900">{cat.title}</h3>
-                </div>
-                <div className="h-px flex-1 bg-gray-100 mx-6" />
+              <Heart size={22} className={cn(isFavorite && "fill-current")} />
+            </button>
+            <button 
+              onClick={handleShare}
+              className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100/80 text-gray-700 hover:bg-gray-200 transition-all active:scale-90"
+            >
+              <Share2 size={20} />
+            </button>
+          </div>
+        </motion.div>
+
+        <div className="flex flex-col gap-6">
+          {/* Mini Map Preview */}
+          {mosque.latitude && mosque.longitude && (
+            <section className="bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100">
+              <div className="h-32 w-full relative z-0 pointer-events-none">
+                <MapContainer 
+                  center={[mosque.latitude, mosque.longitude]} 
+                  zoom={15} 
+                  zoomControl={false}
+                  attributionControl={false}
+                  className="w-full h-full"
+                >
+                  <TileLayer url={mapStyle === 'street' ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"} />
+                  <Marker position={[mosque.latitude, mosque.longitude]} icon={miniMapIcon} />
+                </MapContainer>
               </div>
-              
-              <div className={cn(
-                "grid gap-3",
-                cat.id === 'components' ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"
-              )}>
+              <div className="p-3 bg-white flex justify-between items-center z-10 relative">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {mosque.latitude.toFixed(5)}, {mosque.longitude.toFixed(5)}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleCopyPosition} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-bold text-gray-600 transition-colors">
+                    {copied ? t('Copied', language) : t('Copy', language)}
+                  </button>
+                  <button onClick={handleOpenGoogleMapsRoute} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full text-xs font-bold transition-colors">
+                    Google Maps
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Key Highlights Grid */}
+          {highlights.length > 0 && (
+            <section className="grid grid-cols-2 gap-3">
+              {highlights.map((h, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-[20px] shadow-sm border border-gray-100 flex items-start gap-3">
+                  <div className={cn("p-2.5 rounded-xl shrink-0", `bg-${h.color}-50 text-${h.color}-600`)}>
+                    <h.icon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-0.5">{t(h.label, language)}</p>
+                    <p className="text-base font-black text-gray-900 truncate">{h.value}</p>
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {/* Intelligent Data Rows */}
+          {organizedData.map(cat => (
+            <section key={cat.id} className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-3">
+                 <div className={cn("p-2 rounded-xl shrink-0", cat.bgColor, cat.color)}>
+                  <cat.icon size={18} />
+                 </div>
+                 <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">{cat.title}</h2>
+              </div>
+              <div className="p-2 gap-0.5 flex flex-col">
                 {cat.items.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    className={cn(
-                      "bg-white border border-gray-100 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-200 hover:shadow-md transition-all group cursor-default",
-                      cat.id === 'components' && "flex-row items-center gap-6 bg-emerald-50/10 border-emerald-100/50 p-5"
-                    )}
-                  >
-                    <div className={cn(cat.id === 'components' ? "flex-1" : "")}>
-                      <span className="text-[9px] uppercase tracking-[0.15em] text-gray-400 font-black mb-1.5 block group-hover:text-emerald-600 transition-colors">
-                        {t(item.key, language)}
-                      </span>
-                      {cat.id === 'components' && String(item.value).includes(':') ? (
-                        <div className="grid grid-cols-1 gap-2">
-                          {String(item.value).split(', ').map((part, pIdx) => {
-                            const [label, val] = part.split(': ');
-                            return (
-                              <div key={pIdx} className="flex items-center justify-between bg-white/80 backdrop-blur-sm p-2 rounded-lg border border-emerald-100/30 shadow-sm">
-                                <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">{label}</span>
-                                <span className="text-base font-serif font-black text-gray-900">{val}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <span className={cn(
-                          "text-gray-900 font-serif font-bold leading-tight",
-                          cat.id === 'components' ? "text-lg" : "text-sm"
-                        )}>
-                          {t(String(item.value), language)}
-                        </span>
-                      )}
-                    </div>
-                    {cat.id === 'components' && (
-                      <div className="h-12 w-1 bg-emerald-200 rounded-full group-hover:bg-emerald-400 transition-colors" />
-                    )}
+                  <div key={idx} className="flex items-start justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                    <span className="text-xs font-bold text-gray-500 max-w-[40%] leading-relaxed">{t(item.key, language)}</span>
+                    <span className="text-sm font-medium text-gray-900 text-right max-w-[55%]">{t(String(item.value), language)}</span>
                   </div>
                 ))}
               </div>
-            </motion.section>
+            </section>
           ))}
-        </div>
 
-        {/* Services & Facilities */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-12 pt-12 border-t border-gray-100">
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] uppercase tracking-[0.3em] font-black text-gray-400">{t('Services', language)}</h3>
-              <div className="h-px flex-1 bg-gray-100 mx-4" />
-            </div>
-            <div className="grid grid-cols-1 gap-3">
+          {/* Facilities and Services Chips */}
+          <section className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-5 mt-4">
+            <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">{t('Services & Facilities', language)}</h2>
+            
+            <div className="flex flex-wrap gap-2 mb-4">
               {mosque.services.map(service => (
-                <motion.div 
-                  key={service} 
-                  whileHover={{ x: 4 }}
-                  className="flex items-center p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 hover:bg-emerald-50 transition-colors"
-                >
-                  <CheckCircle2 size={18} className={`text-emerald-600 shrink-0 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
-                  <span className="text-sm text-emerald-900 font-bold">{t(service, language)}</span>
-                </motion.div>
+                <div key={service} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100/50 rounded-full text-xs font-bold text-emerald-700">
+                  <CheckCircle2 size={12} className="text-emerald-500 fill-emerald-100" />
+                  {t(service, language)}
+                </div>
               ))}
             </div>
-          </section>
 
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] uppercase tracking-[0.3em] font-black text-gray-400">{t('Facilities', language)}</h3>
-              <div className="h-px flex-1 bg-gray-100 mx-4" />
-            </div>
-            <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-wrap gap-2">
               {mosque.items.map(item => (
-                <span key={item} className="px-5 py-2.5 bg-gray-50 text-gray-700 text-[11px] font-bold uppercase tracking-widest rounded-full border border-gray-100 hover:bg-white hover:border-emerald-200 transition-all cursor-default">
+                <div key={item} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[11px] font-bold uppercase tracking-wider rounded-md border border-gray-200/50">
                   {t(item, language)}
-                </span>
+                </div>
               ))}
-              {mosque.items.length === 0 && (
-                <span className="text-xs text-gray-400 italic font-medium">{t('No facilities listed', language)}</span>
+              {mosque.services.length === 0 && mosque.items.length === 0 && (
+                <p className="text-sm text-gray-400 italic font-medium w-full text-center py-2">{t('No specific facilities listed', language)}</p>
               )}
             </div>
           </section>
+
         </div>
       </div>
     </motion.div>

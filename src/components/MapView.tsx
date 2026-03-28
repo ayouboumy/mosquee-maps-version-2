@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo, memo, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap, useMapEvents, Polyline } from 'react-leaflet';
+import { motion, AnimatePresence } from 'motion/react';
+import { Navigation, Clock } from 'lucide-react';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -190,7 +192,7 @@ function RouteLine({ start, end, straightDistance, isMainRoute, routeProfile = '
           ? 'https://routing.openstreetmap.de/routed-foot/route/v1/foot'
           : 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
         
-        const response = await fetch(`${ baseUrl } / ${ start[1]}, ${ start[0]};${ end[1] },${ end[0] }?overview = full & geometries=geojson & alternatives=true`);
+        const response = await fetch(`${baseUrl}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&alternatives=true`);
         const data = await response.json();
         if (isMounted && data.routes && data.routes.length > 0) {
           // Find the route with the absolute shortest distance among all alternatives
@@ -231,12 +233,12 @@ function RouteLine({ start, end, straightDistance, isMainRoute, routeProfile = '
 
   const isDriving = routeProfile === 'driving';
   
-  // Google Maps Colors
-  const mainInnerColor = isDriving ? '#4285F4' : '#1A73E8'; // Google Blue
-  const mainOuterColor = isDriving ? '#174EA6' : '#FFFFFF'; // Dark blue casing for driving, white halo for walking
+  // Google Maps Style Premium Colors
+  const mainInnerColor = isDriving ? '#3B82F6' : '#10B981'; // Blue for driving, Emerald for walking
+  const mainOuterColor = isDriving ? '#1D4ED8' : '#047857'; 
   
-  const altInnerColor = '#80868B'; // Gray
-  const altOuterColor = '#5F6368'; // Dark Gray
+  const altInnerColor = '#9CA3AF'; // Gray
+  const altOuterColor = '#4B5563'; // Dark Gray
 
   const innerColor = isMainRoute ? mainInnerColor : altInnerColor;
   const outerColor = isMainRoute ? mainOuterColor : altOuterColor;
@@ -383,7 +385,7 @@ export default function MapView({ showNearest }: { showNearest?: boolean }) {
               ? 'https://routing.openstreetmap.de/routed-foot/route/v1/foot'
               : 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
             
-            const response = await fetch(`${ baseUrl }/${userLocation.longitude},${userLocation.latitude};${m.lng},${m.lat}?overview=false&alternatives=true`);
+            const response = await fetch(`${baseUrl}/${userLocation.longitude},${userLocation.latitude};${m.lng},${m.lat}?overview=false&alternatives=true`);
 if (!response.ok) return null;
 const data = await response.json();
 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -559,6 +561,74 @@ return (
 
       <MapController showNearest={showNearest} nearestMosques={nearestMosques} routingToMosque={routingToMosque} selectedMosque={selectedMosque} />
     </MapContainer>
+
+    <AnimatePresence>
+      {showNearest && nearestMosques.length > 0 && !routingToMosque && (
+        <motion.div 
+          initial={{ y: 200, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 200, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="absolute bottom-24 left-0 right-0 z-[1000] pb-2 pt-4 px-4 overflow-x-auto scrollbar-hide"
+        >
+          <div className="flex gap-4 min-w-max">
+            {nearestMosques.map((mosque, i) => (
+              <motion.button
+                key={mosque.id}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                onClick={() => {
+                  setSelectedMosque(mosque);
+                  setRoutingToMosque(null);
+                }}
+                className={`flex flex-col text-left bg-white/95 backdrop-blur-xl rounded-[24px] p-3 shadow-bottom-sheet w-[240px] border transition-all active:scale-95 ${selectedMosque?.id === mosque.id ? 'border-emerald-400 ring-4 ring-emerald-500/10' : 'border-white/50'}`}
+              >
+                <div className="relative w-full h-24 rounded-[16px] overflow-hidden mb-3">
+                   {mosque.image ? (
+                    <img src={mosque.image} alt={getLocalizedName(mosque, language)} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-emerald-100" />
+                  )}
+                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md rounded-lg px-2 py-1 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-white text-[10px] uppercase font-black tracking-widest leading-none">
+                      #{i + 1} {t('Nearest', language)}
+                    </span>
+                  </div>
+                </div>
+                <h3 className="font-black text-gray-900 leading-tight mb-1 truncate">{getLocalizedName(mosque, language)}</h3>
+                <div className="flex items-center justify-between mt-auto">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 font-bold px-2 py-1 rounded-lg">
+                    {roadDurations[mosque.id] ? (
+                      <>
+                        <Clock size={12} className="shrink-0" />
+                        {Math.round(roadDurations[mosque.id] / 60)} min
+                      </>
+                    ) : (
+                      <>
+                        <Navigation size={12} className="shrink-0" />
+                        {(() => {
+                           try {
+                             return (getDistance(
+                               { latitude: userLocation!.latitude, longitude: userLocation!.longitude },
+                               { latitude: mosque.latitude, longitude: mosque.longitude }
+                             ) / 1000).toFixed(1) + ' km';
+                           } catch (e) {
+                             return '';
+                           }
+                        })()}
+                      </>
+                    )}
+                  </div>
+                  <span className="text-[10px] uppercase font-black text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{t(mosque.type, language)}</span>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   </div>
 );
 }

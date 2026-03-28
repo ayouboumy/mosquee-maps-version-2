@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Navigation, Footprints, MapPin, Car, ArrowLeft, Dot } from 'lucide-react';
+import { Navigation, Footprints, MapPin, Car, ArrowLeft, Dot, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { t } from '../utils/translations';
 import { cn } from '../lib/utils';
@@ -70,9 +70,9 @@ export default function DirectionsPanel() {
             <div className="flex items-start gap-4">
               <button
                 onClick={() => setRoutingToMosque(null)}
-                className="mt-2 p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition-colors active:scale-90"
+                className="mt-2.5 p-3 rounded-[16px] transition-all active:scale-90 bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 shadow-sm"
               >
-                <ArrowLeft size={20} className={language === 'ar' ? 'rotate-180' : ''} />
+                <X size={22} />
               </button>
 
               <div className="flex-1 flex flex-col gap-3 relative py-1">
